@@ -15,7 +15,7 @@ echo "Installing from: $SCRIPT_DIR"
 # Copy presets
 echo "  presets/keyboard/*  -> /etc/tailord/keyboard/"
 install -d -m755 /etc/tailord/keyboard /etc/tailord/profiles
-install -m644 "$SCRIPT_DIR/presets/keyboard/"*.json /etc/tailord/keyboard/
+cp -a "$SCRIPT_DIR/presets/keyboard/"*.json /etc/tailord/keyboard/
 install -m644 "$SCRIPT_DIR/presets/profiles/"*.json /etc/tailord/profiles/
 
 # Copy systemd units

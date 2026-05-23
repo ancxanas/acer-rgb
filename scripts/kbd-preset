@@ -1,0 +1,52 @@
+#!/bin/sh
+# Switch keyboard backlight preset
+# Usage: kbd-preset <name>
+#        kbd-preset list
+
+PRESETS_DIR="/etc/tailord/profiles"
+ACTIVE_LINK="/etc/tailord/active_profile.json"
+
+if [ "$1" = "list" ]; then
+  current_target=$(readlink "$ACTIVE_LINK" 2>/dev/null || echo "")
+  echo "Available presets:"
+  for f in "$PRESETS_DIR"/*.json; do
+    [ -f "$f" ] || continue
+    name=$(basename "$f" .json)
+    marker=""
+    [ "$f" = "$current_target" ] && marker="  <- active"
+    printf "  %-22s%s\n" "$name" "$marker"
+  done
+  exit 0
+fi
+
+if [ -z "$1" ]; then
+  echo "Usage: kbd-preset <name>"
+  echo "       kbd-preset list"
+  echo ""
+  echo "Presets:"
+  for f in "$PRESETS_DIR"/*.json; do
+    [ -f "$f" ] || continue
+    name=$(basename "$f" .json)
+    printf "  %s\n" "$name"
+  done
+  exit 1
+fi
+
+if [ ! -f "$PRESETS_DIR/$1.json" ]; then
+  echo "Error: preset '$1' not found"
+  echo "Run 'kbd-preset list' to see available presets"
+  exit 1
+fi
+
+sudo /usr/bin/systemctl restart "kbd-preset@$1.service" 2>/dev/null
+SWITCH_OK=$?
+
+sudo /usr/bin/systemctl restart tailord.service 2>/dev/null
+
+if [ $SWITCH_OK -eq 0 ]; then
+  echo "Switched to: $1"
+else
+  echo "Error: failed to switch to '$1'"
+  echo "Ensure tailord.service is running: sudo systemctl status tailord.service"
+  exit 1
+fi

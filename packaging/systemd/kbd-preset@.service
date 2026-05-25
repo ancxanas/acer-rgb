@@ -1,7 +1,0 @@
-[Unit]
-Description=Switch keyboard backlight preset to %i
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'ln -sf /etc/tailord/profiles/%i.json /etc/tailord/active_profile.json'
-ExecStartPost=/bin/sh -c 'systemctl restart tailord.service || true'

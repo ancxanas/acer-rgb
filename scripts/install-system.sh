@@ -21,7 +21,6 @@ install -m644 "$SCRIPT_DIR/presets/profiles/"*.json /etc/tailord/profiles/
 # Copy systemd units
 echo "  packaging/systemd/  -> /etc/systemd/system/"
 install -m644 "$SCRIPT_DIR/packaging/systemd/tailord.service" /etc/systemd/system/tailord.service
-install -m644 "$SCRIPT_DIR/packaging/systemd/kbd-preset@.service" /etc/systemd/system/kbd-preset@.service
 
 # Copy modprobe configs
 echo "  packaging/modules-load.d/  -> /etc/modules-load.d/"

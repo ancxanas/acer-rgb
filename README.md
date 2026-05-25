@@ -1,13 +1,15 @@
 # acer-rgb
 
-Keyboard backlight enablement for Acer Aspire A715-79G (and similar) using TUXEDO Computers kernel drivers with a DMI bypass patch.
+Keyboard backlight enablement for Acer Aspire A715-79G (and similar) using
+TUXEDO Computers kernel drivers with a DMI bypass patch.
 
 ## What it does
 
-- Loads `clevo_wmi` + `tuxedo_keyboard` kernel modules at boot (patched to bypass DMI hardware check)
+- Loads `clevo_wmi` + `tuxedo_keyboard` kernel modules at boot (patched to
+  bypass DMI hardware check)
 - Creates `/sys/class/leds/rgb:kbd_backlight/` LED class device
 - Runs `tailord` daemon to animate RGB colors via sysfs
-- Provides 16 preset color profiles and a `kbd-preset` command to switch between them
+- Provides 16 preset color profiles and a `kbdctl` command to control them
 
 ## Quick start
 
@@ -24,10 +26,25 @@ sudo modprobe clevo_wmi
 # 4. Start daemon
 sudo systemctl start tailord.service
 
-# 5. Switch presets
-kbd-preset rainbow
-kbd-preset list
+# 5. Use it
+kbdctl preset list
+kbdctl preset switch rainbow
+kbdctl brightness up
 ```
+
+## Usage
+
+```
+kbdctl brightness up|down|set|get|toggle|max|steps
+kbdctl preset list|switch <name>
+kbdctl setup
+kbdctl help
+```
+
+Brightness controls use PowerDevil's D-Bus interface — the KDE brightness
+OSD popup appears on every change. No sudo needed.
+
+Preset switching uses tailord's D-Bus interface — instant, no sudo.
 
 ## Presets
 
@@ -57,9 +74,10 @@ kbd-preset list
 ├── packaging/systemd/    ← systemd service templates
 ├── packaging/modules-load.d/  ← kernel module auto-load
 ├── packaging/modprobe.d/      ← module parameters
+├── packaging/kglobalaccel/    ← KDE shortcut .desktop files
 ├── patches/              ← DMI bypass patch
 ├── scripts/
-│   ├── kbd-preset             ← preset switching command
+│   ├── kbdctl                 ← unified CLI (brightness + presets)
 │   ├── install-system.sh      ← system installation
 │   ├── uninstall.sh           ← system removal
 │   └── apply-dmi-patch.sh     ← DKMS patch application
@@ -74,6 +92,17 @@ kbd-preset list
 - `tuxedo-drivers` package from the official TUXEDO repository
 - `tailord` from tuxedo-rs (built from source)
 - DKMS patches rebuild after kernel updates
+
+## KDE Plasma shortcuts
+
+After installing, run `kbdctl setup` to register global shortcuts:
+
+| Key | Action |
+|-----|--------|
+| `Meta+K` | Brightness up (with OSD) |
+| `Ctrl+Shift+K` | Brightness down (with OSD) |
+
+These can be customized in System Settings > Keyboard > Shortcuts > Custom Shortcuts.
 
 ## Uninstall
 

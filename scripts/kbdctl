@@ -1,0 +1,280 @@
+#!/bin/sh
+# kbdctl - Keyboard backlight control for Acer/TUXEDO laptops
+# Usage: kbdctl <command> [args]
+
+set -e
+
+POWERDEVIL_BUS="org.kde.Solid.PowerManagement"
+POWERDEVIL_OBJECT="/org/kde/Solid/PowerManagement/Actions/KeyboardBrightnessControl"
+POWERDEVIL_IFACE="org.kde.Solid.PowerManagement.Actions.KeyboardBrightnessControl"
+
+TAILORD_BUS="com.tux.Tailor"
+TAILORD_OBJECT="/com/tux/Tailor"
+TAILORD_PROFILES_IFACE="com.tux.Tailor.Profiles"
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+PREV_FILE="$CACHE_DIR/kbdctl-prev"
+DESKTOP_DIR="$HOME/.local/share/kglobalaccel"
+
+# ---- helpers ----
+
+set_brightness() {
+    dbus-send --session --dest="$POWERDEVIL_BUS" --type=method_call \
+        "$POWERDEVIL_OBJECT" "$POWERDEVIL_IFACE.setKeyboardBrightness" int32:"$1"
+}
+
+set_brightness_silent() {
+    dbus-send --session --dest="$POWERDEVIL_BUS" --type=method_call \
+        "$POWERDEVIL_OBJECT" "$POWERDEVIL_IFACE.setKeyboardBrightnessSilent" int32:"$1"
+}
+
+get_brightness() {
+    dbus-send --session --dest="$POWERDEVIL_BUS" --type=method_call --print-reply \
+        "$POWERDEVIL_OBJECT" "$POWERDEVIL_IFACE.keyboardBrightness" 2>/dev/null \
+        | grep int32 | awk '{print $2}'
+}
+
+get_max_brightness() {
+    dbus-send --session --dest="$POWERDEVIL_BUS" --type=method_call --print-reply \
+        "$POWERDEVIL_OBJECT" "$POWERDEVIL_IFACE.keyboardBrightnessMax" 2>/dev/null \
+        | grep int32 | awk '{print $2}'
+}
+
+get_brightness_steps() {
+    dbus-send --session --dest="$POWERDEVIL_BUS" --type=method_call --print-reply \
+        "$POWERDEVIL_OBJECT" "$POWERDEVIL_IFACE.keyboardBrightnessSteps" 2>/dev/null \
+        | grep int32 | awk '{print $2}'
+}
+
+calculate_steps() {
+    max=$1
+    if [ "$max" -le 7 ]; then echo "$max"
+    elif [ "$((max % 5))" -eq 0 ] || [ "$max" -ge 80 ]; then echo 5
+    elif [ "$((max % 4))" -eq 0 ]; then echo 4
+    elif [ "$((max % 6))" -eq 0 ]; then echo 6
+    elif [ "$((max % 3))" -eq 0 ]; then echo 3
+    else echo 5
+    fi
+}
+
+# ---- subcommands ----
+
+cmd_brightness() {
+    SUB="${1:-help}"; shift 2>/dev/null || true
+
+    max=$(get_max_brightness)
+    steps=$(calculate_steps "$max")
+    step_size=$(( max / steps ))
+
+    case "$SUB" in
+        up)
+            current=$(get_brightness)
+            new=$(( current + step_size > max ? max : current + step_size ))
+            set_brightness "$new"
+            echo "$new"
+            ;;
+        down)
+            current=$(get_brightness)
+            new=$(( current - step_size < 0 ? 0 : current - step_size ))
+            set_brightness "$new"
+            echo "$new"
+            ;;
+        set)
+            val=$1
+            if [ -z "$val" ]; then
+                echo "Usage: kbdctl brightness set <0-$max>" >&2; exit 1
+            fi
+            if [ "$val" -lt 0 ] 2>/dev/null || [ "$val" -gt "$max" ] 2>/dev/null; then
+                echo "Error: value must be 0-$max" >&2; exit 1
+            fi
+            set_brightness "$val"
+            echo "$val"
+            ;;
+        get) get_brightness ;;
+        toggle)
+            current=$(get_brightness)
+            if [ "$current" -gt 0 ]; then
+                echo "$current" > "$PREV_FILE"
+                set_brightness_silent 0
+                echo 0
+            else
+                if [ -f "$PREV_FILE" ]; then
+                    prev=$(cat "$PREV_FILE")
+                else
+                    prev=$max
+                fi
+                set_brightness "$prev"
+                echo "$prev"
+            fi
+            ;;
+        max) echo "$max" ;;
+        steps) echo "$steps" ;;
+        help)
+            echo "Usage: kbdctl brightness <command> [value]"
+            echo ""
+            echo "Commands:"
+            echo "  up              Increase brightness by one step"
+            echo "  down            Decrease brightness by one step"
+            echo "  set <value>    Set brightness to absolute value (see max)"
+            echo "  get             Print current brightness"
+            echo "  toggle          Toggle backlight off/on"
+            echo "  max             Print maximum brightness"
+            echo "  steps           Print number of brightness steps"
+            ;;
+        *)
+            echo "Error: unknown brightness command '$SUB'" >&2
+            echo "Usage: kbdctl brightness <up|down|set|get|toggle|max|steps|help>" >&2
+            exit 1
+            ;;
+    esac
+}
+
+cmd_preset() {
+    SUB="${1:-help}"; shift 2>/dev/null || true
+
+    busy_call() {
+        busctl call "$TAILORD_BUS" "$TAILORD_OBJECT" "$TAILORD_PROFILES_IFACE" "$@" 2>/dev/null
+    }
+
+    case "$SUB" in
+        list)
+            active=$(busy_call GetActiveProfileName | cut -d' ' -f2 | tr -d '"')
+            echo "Available presets:"
+            busy_call ListProfiles | cut -d' ' -f3- | tr ' ' '\n' | while read -r name; do
+                [ -z "$name" ] && continue
+                name=$(echo "$name" | tr -d '"')
+                marker=""
+                [ "$name" = "$active" ] && marker="  <- active"
+                printf "  %-22s%s\n" "$name" "$marker"
+            done
+            ;;
+        switch)
+            name="$1"
+            if [ -z "$name" ]; then
+                echo "Usage: kbdctl preset switch <name>" >&2
+                echo "Run 'kbdctl preset list' to see available presets" >&2
+                exit 1
+            fi
+            if ! busy_call SetActiveProfileName s "$name" >/dev/null 2>&1; then
+                echo "Error: preset '$name' not found" >&2
+                busy_call ListProfiles | cut -d' ' -f3- | tr ' ' '\n' | while read -r p; do
+                    printf "  %s\n" "$p"
+                done
+                exit 1
+            fi
+            busy_call Reload >/dev/null 2>&1 || true
+            echo "Switched to: $name"
+            ;;
+        help)
+            echo "Usage: kbdctl preset <command> [name]"
+            echo ""
+            echo "Commands:"
+            echo "  list            List available presets"
+            echo "  switch <name>   Switch to a preset"
+            ;;
+        *)
+            echo "Error: unknown preset command '$SUB'" >&2
+            echo "Usage: kbdctl preset <list|switch|help>" >&2
+            exit 1
+            ;;
+    esac
+}
+
+cmd_setup() {
+    echo "Installing shortcut desktop files..."
+    mkdir -p "$DESKTOP_DIR"
+
+    cat > "$DESKTOP_DIR/kbdctl-brightness-up.desktop" <<-EOF
+	[Desktop Entry]
+	Exec=kbdctl brightness up
+	Name=Keyboard Brightness Up
+	NoDisplay=true
+	Type=Application
+	X-KDE-GlobalAccel-CommandShortcut=true
+	EOF
+
+    cat > "$DESKTOP_DIR/kbdctl-brightness-down.desktop" <<-EOF
+	[Desktop Entry]
+	Exec=kbdctl brightness down
+	Name=Keyboard Brightness Down
+	NoDisplay=true
+	Type=Application
+	X-KDE-GlobalAccel-CommandShortcut=true
+	EOF
+
+    # Remove old desktop files
+    rm -f "$DESKTOP_DIR/kbd-brightness-up.desktop" "$DESKTOP_DIR/kbd-brightness-down.desktop"
+
+    echo "Registering shortcuts with KDE..."
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbdctl-brightness-up.desktop" --key "_k_friendly_name" "Keyboard Brightness Up"
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbdctl-brightness-up.desktop" --key "_launch" "Meta+K,none,Keyboard Brightness Up"
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbdctl-brightness-down.desktop" --key "_k_friendly_name" "Keyboard Brightness Down"
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbdctl-brightness-down.desktop" --key "_launch" "Ctrl+Shift+K,none,Keyboard Brightness Down"
+
+    # Remove old service entries
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "services" --key "kbd-brightness-down.desktop" "" --delete 2>/dev/null || true
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "services" --key "kbd-brightness-up.desktop" "" --delete 2>/dev/null || true
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbd-brightness-down.desktop" --key "_launch" "" --delete 2>/dev/null || true
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbd-brightness-down.desktop" --key "_k_friendly_name" "" --delete 2>/dev/null || true
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbd-brightness-up.desktop" --key "_launch" "" --delete 2>/dev/null || true
+    kwriteconfig6 --file kglobalshortcutsrc \
+      --group "kbd-brightness-up.desktop" --key "_k_friendly_name" "" --delete 2>/dev/null || true
+
+    echo "Restarting kglobalaccel..."
+    systemctl --user restart plasma-kglobalaccel.service 2>/dev/null || true
+
+    echo ""
+    echo "Done! Shortcuts:"
+    echo "  Win+K          -> keyboard brightness up (with OSD)"
+    echo "  Ctrl+Shift+K   -> keyboard brightness down (with OSD)"
+    echo ""
+    echo "Also available as a CLI tool:"
+    echo "  kbdctl brightness up|down|set|get|toggle|max|steps"
+    echo "  kbdctl preset list|switch <name>"
+}
+
+cmd_help() {
+    echo "Usage: kbdctl <command> [args]"
+    echo ""
+    echo "Commands:"
+    echo "  brightness <sub>  Control keyboard backlight brightness"
+    echo "  preset <sub>      Switch keyboard backlight presets"
+    echo "  setup             Register KDE Plasma global shortcuts"
+    echo "  help              Show this help"
+    echo ""
+    echo "Brightness subcommands:"
+    echo "  up|down           Change brightness by one step"
+    echo "  set <value>       Set brightness to absolute value (see max)"
+    echo "  get               Print current brightness"
+    echo "  toggle            Toggle backlight off/on"
+    echo "  max|steps         Print max brightness or step count"
+    echo ""
+    echo "Preset subcommands:"
+    echo "  list              List available presets"
+    echo "  switch <name>     Switch to a preset"
+}
+
+# ---- main dispatch ----
+
+CMD="${1:-help}"; shift 2>/dev/null || true
+
+case "$CMD" in
+    brightness) cmd_brightness "$@" ;;
+    preset) cmd_preset "$@" ;;
+    setup) cmd_setup ;;
+    help|--help|-h) cmd_help ;;
+    *)
+        echo "Error: unknown command '$CMD'" >&2
+        cmd_help
+        exit 1
+        ;;
+esac

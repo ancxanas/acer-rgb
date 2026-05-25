@@ -26,7 +26,9 @@ rm -rf /etc/tailord/keyboard
 rm -rf /etc/tailord/profiles
 rm -f /etc/tailord/active_profile.json
 
-echo "Removing kbd-preset command..."
+echo "Removing commands..."
+rm -f /usr/local/bin/kbdctl
+rm -f /usr/local/bin/kbd-brightness
 rm -f /usr/local/bin/kbd-preset
 
 systemctl daemon-reload

@@ -30,13 +30,14 @@ install -m644 "$SCRIPT_DIR/packaging/modules-load.d/clevo-wmi.conf" /etc/modules
 echo "  packaging/modprobe.d/  -> /etc/modprobe.d/"
 install -m644 "$SCRIPT_DIR/packaging/modprobe.d/tuxedo-keyboard.conf" /etc/modprobe.d/tuxedo-keyboard.conf
 
-# Install kbd-preset and kbd-brightness commands
-echo "  scripts/kbd-preset  -> /usr/local/bin/kbd-preset"
-install -m755 "$SCRIPT_DIR/scripts/kbd-preset" /usr/local/bin/kbd-preset
-echo "  scripts/kbd-brightness  -> /usr/local/bin/kbd-brightness"
-install -m755 "$SCRIPT_DIR/scripts/kbd-brightness" /usr/local/bin/kbd-brightness
+# Install kbdctl command
+echo "  scripts/kbdctl  -> /usr/local/bin/kbdctl"
+install -m755 "$SCRIPT_DIR/scripts/kbdctl" /usr/local/bin/kbdctl
 
-# Install KDE global shortcut desktop files
+# Remove old commands
+rm -f /usr/local/bin/kbd-brightness /usr/local/bin/kbd-preset
+
+# Install KDE global shortcut desktop files (source for kbdctl setup)
 echo "  packaging/kglobalaccel/  -> /usr/local/share/acer-rgb/kglobalaccel/"
 install -d -m755 /usr/local/share/acer-rgb/kglobalaccel
 install -m644 "$SCRIPT_DIR/packaging/kglobalaccel/"*.desktop /usr/local/share/acer-rgb/kglobalaccel/
@@ -54,18 +55,20 @@ fi
 if [ -n "$SUDO_USER" ] && [ -d "/home/$SUDO_USER" ]; then
   echo ""
   echo "  Setting up KDE shortcuts for $SUDO_USER..."
-  runuser -u "$SUDO_USER" "$SCRIPT_DIR/scripts/setup-kbd-shortcuts.sh" 2>/dev/null || true
+  runuser -u "$SUDO_USER" /usr/local/bin/kbdctl setup 2>/dev/null || true
 fi
 
 echo ""
 echo "Installation complete."
 echo "  - tailord.service is enabled"
 echo "  - clevo-wmi.conf loaded at boot"
-echo "  - kbd-preset command available"
-echo "  - kbd-brightness command available (shows OSD via PowerDevil)"
+echo "  - kbdctl command available"
+echo ""
+echo "Usage:"
+echo "  kbdctl brightness up|down|set|get|toggle    (shows OSD)"
+echo "  kbdctl preset list|switch <name>"
 echo ""
 echo "Next steps:"
 echo "  1. Apply DMI patch:  sudo ./scripts/apply-dmi-patch.sh"
 echo "  2. Reboot or run:    sudo modprobe clevo_wmi"
 echo "  3. Start tailord:    sudo systemctl start tailord.service"
-echo "  4. Switch presets:   kbd-preset list"

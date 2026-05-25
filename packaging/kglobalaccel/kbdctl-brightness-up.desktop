@@ -1,5 +1,5 @@
 [Desktop Entry]
-Exec=kbd-brightness up
+Exec=kbdctl brightness up
 Name=Keyboard Brightness Up
 NoDisplay=true
 Type=Application

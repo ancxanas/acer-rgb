@@ -220,7 +220,17 @@ Last point ──transition──→ Point 0 ──→ Point 1 ──→ ... ─
 ## 6. Commands
 
 ```bash
-# Restart tailord after profile change
+# Change brightness (with KDE OSD)
+kbdctl brightness up
+kbdctl brightness down
+kbdctl brightness set 128
+kbdctl brightness get
+
+# Switch presets (no sudo needed)
+kbdctl preset list
+kbdctl preset switch rainbow
+
+# Restart tailord after manual profile change
 sudo systemctl restart tailord.service
 
 # Read current color
@@ -272,6 +282,9 @@ Then a profile selector:
 
 Switch:
 ```bash
+kbdctl preset switch amber
+
+# Or manually:
 sudo ln -sf /etc/tailord/profiles/amber.json /etc/tailord/active_profile.json
 sudo systemctl restart tailord.service
 ```
@@ -321,6 +334,7 @@ tailord pre-computes all frames at startup:
 | `/etc/tailord/fan/default.json` | Fan curve |
 | `/etc/systemd/system/tailord.service` | tailord systemd service |
 | `/usr/bin/tailord` | Built from tuxedo-rs |
+| `/usr/local/bin/kbdctl` | Unified CLI (brightness + presets) |
 | `/usr/share/dbus-1/system.d/com.tux.Tailor.conf` | D-Bus policy |
 | `/etc/modules-load.d/clevo-wmi.conf` | Auto-load clevo_wmi |
 | `/etc/modprobe.d/tuxedo-keyboard.conf` | Module parameters |
@@ -328,4 +342,4 @@ tailord pre-computes all frames at startup:
 
 ---
 
-*Updated May 23, 2026*
+*Updated May 25, 2026*

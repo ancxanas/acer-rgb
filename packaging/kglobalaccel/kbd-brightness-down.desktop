@@ -1,0 +1,6 @@
+[Desktop Entry]
+Exec=kbd-brightness down
+Name=Keyboard Brightness Down
+NoDisplay=true
+Type=Application
+X-KDE-GlobalAccel-CommandShortcut=true

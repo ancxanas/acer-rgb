@@ -30,9 +30,16 @@ install -m644 "$SCRIPT_DIR/packaging/modules-load.d/clevo-wmi.conf" /etc/modules
 echo "  packaging/modprobe.d/  -> /etc/modprobe.d/"
 install -m644 "$SCRIPT_DIR/packaging/modprobe.d/tuxedo-keyboard.conf" /etc/modprobe.d/tuxedo-keyboard.conf
 
-# Install kbd-preset command
+# Install kbd-preset and kbd-brightness commands
 echo "  scripts/kbd-preset  -> /usr/local/bin/kbd-preset"
 install -m755 "$SCRIPT_DIR/scripts/kbd-preset" /usr/local/bin/kbd-preset
+echo "  scripts/kbd-brightness  -> /usr/local/bin/kbd-brightness"
+install -m755 "$SCRIPT_DIR/scripts/kbd-brightness" /usr/local/bin/kbd-brightness
+
+# Install KDE global shortcut desktop files
+echo "  packaging/kglobalaccel/  -> /usr/local/share/acer-rgb/kglobalaccel/"
+install -d -m755 /usr/local/share/acer-rgb/kglobalaccel
+install -m644 "$SCRIPT_DIR/packaging/kglobalaccel/"*.desktop /usr/local/share/acer-rgb/kglobalaccel/
 
 # Reload systemd and enable services
 systemctl daemon-reload
@@ -43,11 +50,19 @@ if [ ! -L /etc/tailord/active_profile.json ]; then
   ln -sf /etc/tailord/profiles/cycle.json /etc/tailord/active_profile.json
 fi
 
+# Auto-setup KDE global shortcuts for the user who ran sudo
+if [ -n "$SUDO_USER" ] && [ -d "/home/$SUDO_USER" ]; then
+  echo ""
+  echo "  Setting up KDE shortcuts for $SUDO_USER..."
+  runuser -u "$SUDO_USER" "$SCRIPT_DIR/scripts/setup-kbd-shortcuts.sh" 2>/dev/null || true
+fi
+
 echo ""
 echo "Installation complete."
 echo "  - tailord.service is enabled"
 echo "  - clevo-wmi.conf loaded at boot"
 echo "  - kbd-preset command available"
+echo "  - kbd-brightness command available (shows OSD via PowerDevil)"
 echo ""
 echo "Next steps:"
 echo "  1. Apply DMI patch:  sudo ./scripts/apply-dmi-patch.sh"

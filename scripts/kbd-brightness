@@ -1,0 +1,123 @@
+#!/bin/sh
+# Keyboard backlight control via PowerDevil D-Bus (shows OSD, no sudo)
+# Usage: kbd-brightness <command> [value]
+
+set -e
+
+BUS="org.kde.Solid.PowerManagement"
+OBJECT="/org/kde/Solid/PowerManagement/Actions/KeyboardBrightnessControl"
+IFACE="org.kde.Solid.PowerManagement.Actions.KeyboardBrightnessControl"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+PREV_FILE="$CACHE_DIR/kbd-brightness-prev"
+
+dbus_call() {
+    dbus-send --session --dest="$BUS" --type=method_call --print-reply "$OBJECT" "$IFACE"."$@"
+}
+
+get_max() {
+    dbus_call keyboardBrightnessMax | grep int32 | awk '{print $2}'
+}
+
+get() {
+    dbus_call keyboardBrightness | grep int32 | awk '{print $2}'
+}
+
+set_val_silent() {
+    dbus-send --session --dest="$BUS" --type=method_call "$OBJECT" "$IFACE".setKeyboardBrightnessSilent int32:"$1"
+}
+
+set_val() {
+    dbus-send --session --dest="$BUS" --type=method_call "$OBJECT" "$IFACE".setKeyboardBrightness int32:"$1"
+}
+
+compute_steps() {
+    max=$1
+    if [ "$max" -le 7 ]; then
+        echo "$max"
+    elif [ "$((max % 5))" -eq 0 ] || [ "$max" -ge 80 ]; then
+        echo 5
+    elif [ "$((max % 4))" -eq 0 ]; then
+        echo 4
+    elif [ "$((max % 6))" -eq 0 ]; then
+        echo 6
+    elif [ "$((max % 3))" -eq 0 ]; then
+        echo 3
+    else
+        echo 5
+    fi
+}
+
+max=$(get_max)
+steps=$(compute_steps "$max")
+step_size=$(( max / steps ))
+
+case "${1:-help}" in
+    up)
+        current=$(get)
+        new=$(( current + step_size > max ? max : current + step_size ))
+        set_val "$new"
+        echo "$new"
+        ;;
+    down)
+        current=$(get)
+        new=$(( current - step_size < 0 ? 0 : current - step_size ))
+        set_val "$new"
+        echo "$new"
+        ;;
+    set)
+        if [ -z "$2" ]; then
+            echo "Usage: kbd-brightness set <0-$max>" >&2
+            exit 1
+        fi
+        val=$2
+        if [ "$val" -lt 0 ] 2>/dev/null || [ "$val" -gt "$max" ] 2>/dev/null; then
+            echo "Error: value must be 0-$max" >&2
+            exit 1
+        fi
+        set_val "$val"
+        echo "$val"
+        ;;
+    get)
+        get
+        ;;
+    toggle)
+        current=$(get)
+        if [ "$current" -gt 0 ]; then
+            echo "$current" > "$PREV_FILE"
+            set_val_silent 0
+            echo 0
+        else
+            if [ -f "$PREV_FILE" ]; then
+                prev=$(cat "$PREV_FILE")
+            else
+                prev=$max
+            fi
+            set_val "$prev"
+            echo "$prev"
+        fi
+        ;;
+    max)
+        echo "$max"
+        ;;
+    steps)
+        echo "$steps"
+        ;;
+    help|--help|-h)
+        echo "Usage: kbd-brightness <command> [value]"
+        echo ""
+        echo "Commands:"
+        echo "  up              Increase brightness by one step"
+        echo "  down            Decrease brightness by one step"
+        echo "  set <0-$max>    Set brightness to absolute value"
+        echo "  get             Print current brightness"
+        echo "  toggle          Toggle backlight off/on"
+        echo "  max             Print maximum brightness"
+        echo "  steps           Print number of brightness steps"
+        echo "  help            Show this help"
+        ;;
+    *)
+        echo "Error: unknown command '$1'" >&2
+        echo "Usage: kbd-brightness <up|down|set|get|toggle|max|steps|help>" >&2
+        exit 1
+        ;;
+esac

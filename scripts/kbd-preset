@@ -7,13 +7,14 @@ PRESETS_DIR="/etc/tailord/profiles"
 ACTIVE_LINK="/etc/tailord/active_profile.json"
 
 if [ "$1" = "list" ]; then
-  current_target=$(readlink "$ACTIVE_LINK" 2>/dev/null || echo "")
+  current_target=$(readlink -f "$ACTIVE_LINK" 2>/dev/null || echo "")
   echo "Available presets:"
   for f in "$PRESETS_DIR"/*.json; do
     [ -f "$f" ] || continue
     name=$(basename "$f" .json)
+    f_path=$(realpath "$f" 2>/dev/null)
     marker=""
-    [ "$f" = "$current_target" ] && marker="  <- active"
+    [ "$f_path" = "$current_target" ] && marker="  <- active"
     printf "  %-22s%s\n" "$name" "$marker"
   done
   exit 0

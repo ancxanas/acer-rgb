@@ -186,7 +186,7 @@ cmd_setup() {
 
     cat > "$DESKTOP_DIR/kbdctl-brightness-up.desktop" <<-EOF
 	[Desktop Entry]
-	Exec=kbdctl brightness up
+	Exec=/usr/local/bin/kbdctl brightness up
 	Name=Keyboard Brightness Up
 	NoDisplay=true
 	Type=Application
@@ -195,7 +195,7 @@ cmd_setup() {
 
     cat > "$DESKTOP_DIR/kbdctl-brightness-down.desktop" <<-EOF
 	[Desktop Entry]
-	Exec=kbdctl brightness down
+	Exec=/usr/local/bin/kbdctl brightness down
 	Name=Keyboard Brightness Down
 	NoDisplay=true
 	Type=Application

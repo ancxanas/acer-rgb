@@ -1,0 +1,14 @@
+#!/bin/sh
+# Increase keyboard backlight brightness by ~10%
+p="/sys/class/leds/rgb:kbd_backlight/brightness"
+if ! [ -f "$p" ]; then
+    echo "error: $p not found" >&2
+    exit 1
+fi
+cur=$(cat "$p")
+max=$(cat "${p%/*}/max_brightness")
+step=$(( max / 10 ))
+[ "$step" -lt 1 ] && step=1
+new=$(( cur + step ))
+[ "$new" -gt "$max" ] && new=$max
+printf '%s' "$new" > "$p"

@@ -1,0 +1,16 @@
+[Unit]
+Description=Keyboard RGB Daemon — animates LED class device from profile JSONs
+After=sysinit.target
+
+[Service]
+Type=simple
+ExecStartPre=mkdir -p /run/kbd-rgbd && install -m 666 /dev/null /run/kbd-rgbd/cmd
+ExecStart=/usr/bin/kbd-rgbd
+ExecStop=/usr/local/bin/kbd-off
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

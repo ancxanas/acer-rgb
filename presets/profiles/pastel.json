@@ -1,5 +1,4 @@
 {
-  "fans": ["default", "default"],
   "leds": [
     {
       "device_name": "platform:tuxedo_keyboard",
@@ -7,6 +6,5 @@
       "profile": "pastel",
       "mode": "Rgb"
     }
-  ],
-  "performance_profile": "performance"
+  ]
 }

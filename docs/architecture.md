@@ -53,7 +53,7 @@ Linear behavior.
 ```json
 { "leds": [{
     "device_name": "platform:tuxedo_keyboard",
-    "function": "kbd_background",
+    "function": "kbd_backlight",
     "profile": "<keyboard_profile_name>",
     "mode": "Rgb"
 }]}
@@ -77,6 +77,10 @@ Updated atomically via `.tmp` + `rename()`.
 | `Multiple` | `None` | Snap to target color, sleep `transition_time` ms |
 
 Interpolation: `lerp(a, b, t) = a + (b - a) * t`, per channel, clamped 0–255.
+Uses `0..=steps` (inclusive) to ensure `t=1.0` is reached for all transitions,
+including short ones where `steps=1`. Each segment produces `steps+1` frames;
+the endpoint duplicate at each boundary (~80ms at 12.5FPS) is visually
+negligible.
 
 ## Cmd file protocol
 
@@ -108,13 +112,14 @@ truncates with `set_len(0)` after each read.
 ## Service lifecycle
 
 ```
-systemctl start  → ExecStartPre (3 steps) → daemon starts → loops forever
+systemctl start  → RuntimeDirectory created → daemon starts → loops forever
 systemctl stop   → ExecStop (writes "stop" to cmd) → daemon writes 0 0 0 → exits
 systemctl kill   → SIGTERM → daemon dies (LEDs stay at last color)
 ```
 
-`ExecStop` runs before SIGTERM. `TimeoutStopSec=2`. No signal handler needed
-— the cmd file protocol covers graceful shutdown.
+`RuntimeDirectory=kbd-rgbd` (systemd v240+) creates `/run/kbd-rgbd` before
+`ExecStart`. Daemon creates the cmd file and sets 0666 permissions on startup
+as a fallback. `ExecStop` runs before SIGTERM. `TimeoutStopSec=2`.
 
 ## Error handling
 
@@ -133,6 +138,6 @@ systemctl kill   → SIGTERM → daemon dies (LEDs stay at last color)
 | IPC | D-Bus | Regular file |
 | Brightness | PowerDevil D-Bus | Daemon writes sysfs directly |
 | Profile switching | tailord D-Bus method | `profile <name>` cmd |
-| Binary size | ~4MB+ | ~470KB stripped |
-| Runtime deps | D-Bus, KDE, Python | None (libc only) |
+| Binary size | ~4MB+ | ~356KB stripped |
+| Runtime deps | D-Bus, KDE, Python | libc only |
 | Error type | — | `KbdError` with `From<io::Error>` + `From<serde_json::Error>` |

@@ -53,7 +53,7 @@ sudo modprobe clevo_wmi
 
 # 4. Use it
 kbd-preset-list
-kbd-preset-switch rainbow
+kbd-preset-switch
 kbd-brightness-up
 kbd-brightness-down
 kbd-off
@@ -67,7 +67,7 @@ kbd-off
 | `kbd-brightness-down` | Decrease brightness by ~10% |
 | `kbd-preset-switch` | Cycle to next preset |
 | `kbd-preset-list` | List all presets (active marked with `*`) |
-| `kbd-off` | Turn off backlight (stops daemon) |
+| `kbd-off` | Turn off backlight (daemon stays alive) |
 
 Brightness and animations are independent — brightness scales the LED
 class output without affecting the daemon's RGB animation.
@@ -106,7 +106,16 @@ bind = $mod+KB, KB, exec, kbd-preset-switch
 ## Files
 
 ```
-├── src/main.rs                 ← Rust daemon source
+├── src/
+│   ├── main.rs                 ← entrypoint: calls daemon::run()
+│   ├── lib.rs                  ← crate root + re-exports
+│   ├── error.rs                ← KbdError enum + From impls
+│   ├── types.rs                ← JSON types + parsers + 8 tests
+│   ├── animation.rs            ← lerp() + build_frames() + 2 tests
+│   └── runtime.rs              ← daemon runtime + 1 test
+├── tests/
+│   └── profile_loading.rs      ← 2 integration tests
+├── .github/workflows/ci.yml     ← CI: fmt, clippy, test, build --release
 ├── Cargo.toml
 ├── presets/keyboard/           ← animation JSON definitions
 ├── presets/profiles/           ← profile selectors
@@ -119,7 +128,7 @@ bind = $mod+KB, KB, exec, kbd-preset-switch
 │   ├── kbd-brightness-down     ← decrease backlight
 │   ├── kbd-preset-switch       ← cycle to next preset
 │   ├── kbd-preset-list         ← list presets
-│   ├── kbd-off                 ← turn off + stop daemon
+│   ├── kbd-off                 ← turn off (daemon stays alive)
 │   ├── install-system.sh       ← system installation
 │   ├── uninstall.sh            ← system removal
 │   └── apply-dmi-patch.sh      ← DKMS patch application
@@ -131,7 +140,7 @@ bind = $mod+KB, KB, exec, kbd-preset-switch
 
 ## Requirements
 
-- Fedora 44+ (other distros: adapt paths)
+- Linux with systemd v240+ (for `RuntimeDirectory=` support)
 - `tuxedo-drivers` package from the official TUXEDO repository
 - Rust toolchain (for building `kbd-rgbd`)
 - DKMS patches rebuild after kernel updates
@@ -145,6 +154,8 @@ Write to `/run/kbd-rgbd/cmd` (newline-terminated):
 | `stop` | Write `0 0 0` to sysfs, exit |
 | `reload` | Reload current profile from disk |
 | `profile <name>` | Switch to profile (atomically updates symlink) |
+| `brightness_up` | Increase brightness by ~10% (+26, clamped 0–255) |
+| `brightness_down` | Decrease brightness by ~10% (-26, clamped 0–255) |
 
 ## Uninstall
 

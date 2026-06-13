@@ -26,7 +26,7 @@ rm -rf /etc/tailord/profiles
 rm -f /etc/tailord/active_profile.json
 
 echo "Removing daemon..."
-rm -f /usr/bin/kbd-rgbd
+rm -f /usr/local/bin/kbd-rgbd
 rm -f /usr/local/bin/kbdctl
 rm -f /usr/local/bin/kbd-brightness
 rm -f /usr/local/bin/kbd-preset

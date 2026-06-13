@@ -17,8 +17,8 @@ echo "  building kbd-rgbd..."
 (cd "$SCRIPT_DIR" && cargo build --release)
 
 # Install daemon binary
-echo "  /usr/bin/kbd-rgbd"
-install -m755 "$SCRIPT_DIR"/target/release/kbd-rgbd /usr/bin/kbd-rgbd
+echo "  /usr/local/bin/kbd-rgbd"
+install -m755 "$SCRIPT_DIR"/target/release/kbd-rgbd /usr/local/bin/kbd-rgbd
 
 # Install control scripts
 echo "  /usr/local/bin/kbd-*"

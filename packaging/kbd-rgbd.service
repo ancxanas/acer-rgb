@@ -4,9 +4,11 @@ After=sysinit.target
 
 [Service]
 Type=simple
-ExecStartPre=mkdir -p /run/kbd-rgbd && install -m 666 /dev/null /run/kbd-rgbd/cmd
-ExecStart=/usr/bin/kbd-rgbd
-ExecStop=/usr/local/bin/kbd-off
+RuntimeDirectory=kbd-rgbd
+RuntimeDirectoryMode=0755
+ExecStart=/usr/local/bin/kbd-rgbd
+ExecStop=/bin/sh -c 'printf stop\\n > /run/kbd-rgbd/cmd'
+TimeoutStopSec=2
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

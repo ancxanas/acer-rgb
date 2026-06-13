@@ -1,6 +1,0 @@
-[Desktop Entry]
-Exec=/usr/local/bin/kbdctl brightness up
-Name=Keyboard Brightness Up
-NoDisplay=true
-Type=Application
-X-KDE-GlobalAccel-CommandShortcut=true

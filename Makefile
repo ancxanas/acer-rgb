@@ -1,11 +1,14 @@
 PREFIX ?= /usr/local
 DESTDIR ?=
 
-.PHONY: install install-system uninstall patch-dkms
+.PHONY: all build install uninstall patch-dkms
 
-install: install-system
+all: build
 
-install-system:
+build:
+	cargo build --release
+
+install:
 	sudo -E env "PATH=$$PATH" ./scripts/install-system.sh
 
 uninstall:

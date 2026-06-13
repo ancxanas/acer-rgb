@@ -20,10 +20,14 @@ echo "Removing modprobe config..."
 rm -f /etc/modules-load.d/clevo-wmi.conf
 rm -f /etc/modprobe.d/tuxedo-keyboard.conf
 
-echo "Removing presets..."
+echo "Removing presets and config..."
 rm -rf /etc/tailord/keyboard
 rm -rf /etc/tailord/profiles
+rm -rf /etc/tailord/fan
 rm -f /etc/tailord/active_profile.json
+
+echo "Removing old tailord binary..."
+rm -f /usr/bin/tailord
 
 echo "Removing daemon..."
 rm -f /usr/local/bin/kbd-rgbd

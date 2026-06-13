@@ -8,13 +8,41 @@ TUXEDO Computers kernel drivers with a DMI bypass patch.
 - Loads `clevo_wmi` + `tuxedo_keyboard` kernel modules at boot (patched to
   bypass DMI hardware check)
 - Creates `/sys/class/leds/rgb:kbd_backlight/` LED class device
-- Runs `tailord` daemon to animate RGB colors via sysfs
-- Provides 16 preset color profiles and a `kbdctl` command to control them
+- Runs `kbd-rgbd` — a minimal Rust daemon that animates RGB colors via sysfs
+- Provides 16 preset color profiles and shell scripts to control them
+- No D-Bus, no KDE dependencies, no Python
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                  kbd-preset-switch               │
+│                  kbd-preset-list                 │
+│                  kbd-off                         │
+│                  kbd-brightness-up/down          │
+└───────┬─────────────────────────────┬────────────┘
+        │ write /run/kbd-rgbd/cmd      │ write sysfs
+        ▼                              ▼
+┌────────────────┐           ┌──────────────────┐
+│   kbd-rgbd     │  reads    │  multi_intensity │
+│  (Rust daemon) │◄─────────►│  brightness      │
+│                │  writes   │  (LED class)     │
+└───┬───┬───┬────┘           └──────────────────┘
+    │   │   │
+    │   │   └── /etc/tailord/keyboard/*.json
+    │   │        (animation definitions)
+    │   │
+    │   └────── /etc/tailord/profiles/*.json
+    │            (profile selectors)
+    │
+    └────────── /etc/tailord/active_profile.json
+                 (symlink — atomically swapped)
+```
 
 ## Quick start
 
 ```bash
-# 1. Install system files (presets, services, command)
+# 1. Build and install system-wide
 sudo ./scripts/install-system.sh
 
 # 2. Apply DMI bypass patch (kernel modification — opt in)
@@ -23,28 +51,37 @@ sudo ./scripts/apply-dmi-patch.sh
 # 3. Load modules
 sudo modprobe clevo_wmi
 
-# 4. Start daemon
-sudo systemctl start tailord.service
-
-# 5. Use it
-kbdctl preset list
-kbdctl preset switch rainbow
-kbdctl brightness up
+# 4. Use it
+kbd-preset-list
+kbd-preset-switch rainbow
+kbd-brightness-up
+kbd-brightness-down
+kbd-off
 ```
 
 ## Usage
 
-```
-kbdctl brightness up|down|set|get|toggle|max|steps
-kbdctl preset list|switch <name>
-kbdctl setup
-kbdctl help
-```
+| Command | Description |
+|---------|-------------|
+| `kbd-brightness-up` | Increase brightness by ~10% |
+| `kbd-brightness-down` | Decrease brightness by ~10% |
+| `kbd-preset-switch` | Cycle to next preset |
+| `kbd-preset-list` | List all presets (active marked with `*`) |
+| `kbd-off` | Turn off backlight (stops daemon) |
 
-Brightness controls use PowerDevil's D-Bus interface — the KDE brightness
-OSD popup appears on every change. No sudo needed.
+Brightness and animations are independent — brightness scales the LED
+class output without affecting the daemon's RGB animation.
 
-Preset switching uses tailord's D-Bus interface — instant, no sudo.
+### Hyprland keybinds example
+
+Add to `~/.config/hypr/hyprland.conf`:
+
+```
+bind = , XF86KbdBrightnessUp, exec, kbd-brightness-up
+bind = , XF86KbdBrightnessDown, exec, kbd-brightness-down
+bind = , XF86KbdLightOnOff, exec, kbd-off
+bind = $mod+KB, KB, exec, kbd-preset-switch
+```
 
 ## Presets
 
@@ -69,40 +106,45 @@ Preset switching uses tailord's D-Bus interface — instant, no sudo.
 ## Files
 
 ```
-├── presets/keyboard/     ← animation JSON definitions
-├── presets/profiles/     ← profile selectors
-├── packaging/systemd/    ← systemd service templates
-├── packaging/modules-load.d/  ← kernel module auto-load
-├── packaging/modprobe.d/      ← module parameters
-├── packaging/kglobalaccel/    ← KDE shortcut .desktop files
-├── patches/              ← DMI bypass patch
+├── src/main.rs                 ← Rust daemon source
+├── Cargo.toml
+├── presets/keyboard/           ← animation JSON definitions
+├── presets/profiles/           ← profile selectors
+├── packaging/
+│   ├── kbd-rgbd.service        ← systemd service unit
+│   ├── modules-load.d/         ← kernel module auto-load
+│   └── modprobe.d/             ← module parameters
 ├── scripts/
-│   ├── kbdctl                 ← unified CLI (brightness + presets)
-│   ├── install-system.sh      ← system installation
-│   ├── uninstall.sh           ← system removal
-│   └── apply-dmi-patch.sh     ← DKMS patch application
+│   ├── kbd-brightness-up       ← increase backlight
+│   ├── kbd-brightness-down     ← decrease backlight
+│   ├── kbd-preset-switch       ← cycle to next preset
+│   ├── kbd-preset-list         ← list presets
+│   ├── kbd-off                 ← turn off + stop daemon
+│   ├── install-system.sh       ← system installation
+│   ├── uninstall.sh            ← system removal
+│   └── apply-dmi-patch.sh      ← DKMS patch application
+├── patches/                    ← DMI bypass patch
 └── docs/
-    ├── investigation.md       ← full debugging story
-    └── architecture.md        ← configuration reference
+    ├── investigation.md        ← full debugging story
+    └── architecture.md         ← configuration reference
 ```
 
 ## Requirements
 
 - Fedora 44+ (other distros: adapt paths)
 - `tuxedo-drivers` package from the official TUXEDO repository
-- `tailord` from tuxedo-rs (built from source)
+- Rust toolchain (for building `kbd-rgbd`)
 - DKMS patches rebuild after kernel updates
 
-## KDE Plasma shortcuts
+## Daemon commands
 
-After installing, run `kbdctl setup` to register global shortcuts:
+Write to `/run/kbd-rgbd/cmd` (newline-terminated):
 
-| Key | Action |
-|-----|--------|
-| `Meta+K` | Brightness up (with OSD) |
-| `Ctrl+Shift+K` | Brightness down (with OSD) |
-
-These can be customized in System Settings > Keyboard > Shortcuts > Custom Shortcuts.
+| Command | Effect |
+|---------|--------|
+| `stop` | Write `0 0 0` to sysfs, exit |
+| `reload` | Reload current profile from disk |
+| `profile <name>` | Switch to profile (atomically updates symlink) |
 
 ## Uninstall
 

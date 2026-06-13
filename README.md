@@ -96,11 +96,6 @@ bind = $mod+KB, KB, exec, kbd-preset-switch
 | `snap-cycle` | 6 colors instant snap, 500ms each |
 | `strobe` | White/black 100ms strobe |
 | `police` | Red/blue alternating, 300ms |
-| `static-warmwhite` | Static warm white (255, 200, 100) |
-| `static-red` | Static red |
-| `static-blue` | Static blue |
-| `static-green` | Static green |
-| `static-purple` | Static purple |
 | `off` | Turns backlight off |
 
 ## Files
